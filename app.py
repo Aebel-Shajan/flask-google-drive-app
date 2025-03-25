@@ -1,11 +1,15 @@
+import io
 import os
+from typing import TypedDict
 import flask
 from flask import Flask, request, redirect, url_for, render_template, flash, session
 from werkzeug.utils import secure_filename
 from google_auth_oauthlib.flow import Flow
 from google.oauth2.credentials import Credentials
+import yd_extractor
 
 import drive_helpers as drive_helpers
+import yd_extractor.strong
 
 # Configuration
 app = Flask(__name__)
@@ -48,6 +52,12 @@ def create_flow():
     )
 
 
+
+class DriveFileInfo(TypedDict):
+    webViewLink: str
+    id: str
+    name: str
+
 # Routes
 @app.route("/")
 def index():
@@ -58,11 +68,23 @@ def index():
     credentials = Credentials(**session["credentials"])
     user_info = drive_helpers.retrieve_user_info(credentials)
 
-    # Get the list of user's images
-    files = drive_helpers.retrieve_user_files(credentials)
-
+    # Get the list of user's files
+    input_folder_id = drive_helpers.get_or_create_nested_folder(credentials, "year-in-data/inputs")
+    files: list[DriveFileInfo] = drive_helpers.retrieve_user_files(credentials, parent_id=input_folder_id)
+    print(files)
+    data_sources = []
+    strong_source_found = False
+    for file in files:
+        if file["name"].startswith("strong") and not strong_source_found:
+            data_sources.append(
+                {
+                    "source": "Strong",
+                    **file
+                }
+            )
+    
     return render_template(
-        "index.html", logged_in=True, user_info=user_info, files=files
+        "index.html", logged_in=True, user_info=user_info, data_sources=data_sources
     )
 
 
@@ -103,16 +125,8 @@ def upload_file():
         flash("You need to login first", "warning")
         return redirect(url_for("index"))
 
-    options = [
-        "kindle",
-        "fitbit",
-        "strong"
-    ]
-
     if request.method == "POST":
-        selected_data_source = request.form.get('data-source')
         credentials = Credentials(**session["credentials"])
-        
         
         # Check if the post request has the file part
         if "file" not in request.files:
@@ -120,9 +134,9 @@ def upload_file():
             return redirect(request.url)
         file = request.files["file"]
         
-        folder_id = drive_helpers.get_or_create_nested_folder(
+        input_folder_id = drive_helpers.get_or_create_nested_folder(
             credentials,
-            "year-in-data"
+            "year-in-data/inputs"
         )
 
         # If user does not select file, browser also
@@ -140,7 +154,7 @@ def upload_file():
             drive_helpers.upload_file(
                 credentials, 
                 file_path,     
-                file_metadata = {"name": filename, "parents": [folder_id]}
+                file_metadata = {"name": filename, "parents": [input_folder_id]}
             )
 
             # Clean up temporary file
@@ -149,7 +163,7 @@ def upload_file():
             flash(f"File {filename} successfully uploaded to Google Drive!", "success")
             return redirect(url_for("index"))
     
-    return render_template("upload.html", options=options)
+    return render_template("upload.html")
 
 
 @app.route("/download/<file_id>")
@@ -166,6 +180,35 @@ def download_file(file_id):
     response = flask.make_response(file_io.read())
     response.headers["Content-Disposition"] = f'attachment; filename="{file_name}"'
     return response
+
+@app.route("/process")
+def process_file():
+    if "credentials" not in session:
+        flash("You need to login first", "warning")
+        return redirect(url_for("index"))
+    file_id = request.args.get('file_id')
+    source = request.args.get('source')
+    
+    credentials = Credentials(**session["credentials"])
+    file_io = drive_helpers.download_file(credentials, file_id)
+
+    if source.lower() == "strong":
+        df = yd_extractor.strong.process_workouts(io.TextIOWrapper(file_io))
+        save_path = app.config["UPLOAD_FOLDER"] + "/strong.csv"
+        df.to_csv(save_path, index=False)
+        output_folder_id = drive_helpers.get_or_create_nested_folder(
+            credentials, 
+            "year-in-data/outputs"
+        )
+        drive_helpers.upload_or_overwrite(
+            credentials=credentials, 
+            file_path=save_path, 
+            file_name="strong.csv",
+            parent_id=output_folder_id
+        )
+        os.remove(save_path)
+
+    return "yo"
 
 
 if __name__ == "__main__":
