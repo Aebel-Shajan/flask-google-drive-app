@@ -111,13 +111,19 @@ def upload_file():
 
     if request.method == "POST":
         selected_data_source = request.form.get('data-source')
+        credentials = Credentials(**session["credentials"])
+        
         
         # Check if the post request has the file part
         if "file" not in request.files:
             flash("No file part", "danger")
             return redirect(request.url)
-
         file = request.files["file"]
+        
+        folder_id = drive_helpers.get_or_create_nested_folder(
+            credentials,
+            "year-in-data"
+        )
 
         # If user does not select file, browser also
         # submit an empty part without filename
@@ -131,8 +137,11 @@ def upload_file():
             file.save(file_path)
 
             # Upload to Google Drive
-            credentials = Credentials(**session["credentials"])
-            drive_helpers.upload_file(credentials, filename, file_path)
+            drive_helpers.upload_file(
+                credentials, 
+                file_path,     
+                file_metadata = {"name": filename, "parents": [folder_id]}
+            )
 
             # Clean up temporary file
             os.remove(file_path)
