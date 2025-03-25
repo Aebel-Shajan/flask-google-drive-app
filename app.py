@@ -9,6 +9,8 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
 import io
 
+import drive_helpers as drive_helpers
+
 # Configuration
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # In production, use a stable secret key
@@ -58,21 +60,10 @@ def index():
 
     # Get user info
     credentials = Credentials(**session["credentials"])
-    service = build("oauth2", "v2", credentials=credentials)
-    user_info = service.userinfo().get().execute()
+    user_info = drive_helpers.retrieve_user_info(credentials)
 
     # Get the list of user's images
-    drive_service = build("drive", "v3", credentials=credentials)
-    results = (
-        drive_service.files()
-        .list(
-            q="mimeType contains 'image/'",
-            fields="files(id, name, webViewLink)",
-            pageSize=10,
-        )
-        .execute()
-    )
-    files = results.get("files", [])
+    files = drive_helpers.retrieve_user_files(credentials)
 
     return render_template(
         "index.html", logged_in=True, user_info=user_info, files=files
@@ -116,7 +107,15 @@ def upload_file():
         flash("You need to login first", "warning")
         return redirect(url_for("index"))
 
+    options = [
+        "kindle",
+        "fitbit",
+        "strong"
+    ]
+
     if request.method == "POST":
+        selected_data_source = request.form.get('data-source')
+        
         # Check if the post request has the file part
         if "file" not in request.files:
             flash("No file part", "danger")
@@ -137,24 +136,15 @@ def upload_file():
 
             # Upload to Google Drive
             credentials = Credentials(**session["credentials"])
-            drive_service = build("drive", "v3", credentials=credentials)
-
-            file_metadata = {"name": filename}
-            media = MediaFileUpload(file_path, resumable=True)
-
-            file = (
-                drive_service.files()
-                .create(body=file_metadata, media_body=media, fields="id")
-                .execute()
-            )
+            drive_helpers.upload_file(credentials, filename, file_path)
 
             # Clean up temporary file
             os.remove(file_path)
 
             flash(f"File {filename} successfully uploaded to Google Drive!", "success")
             return redirect(url_for("index"))
-
-    return render_template("upload.html")
+    
+    return render_template("upload.html", options=options)
 
 
 @app.route("/download/<file_id>")
@@ -164,26 +154,12 @@ def download_file(file_id):
         return redirect(url_for("index"))
 
     credentials = Credentials(**session["credentials"])
-    drive_service = build("drive", "v3", credentials=credentials)
-
-    # Get file metadata first to get the name
-    file_metadata = drive_service.files().get(fileId=file_id).execute()
-    filename = file_metadata["name"]
-
-    # Download file
-    request = drive_service.files().get_media(fileId=file_id)
-    file_io = io.BytesIO()
-    downloader = MediaIoBaseDownload(file_io, request)
-
-    done = False
-    while done is False:
-        status, done = downloader.next_chunk()
-
-    file_io.seek(0)
+    file_io = drive_helpers.download_file(credentials, file_id)
+    file_name = drive_helpers.get_file_name(credentials, file_id)
 
     # Create a Flask response with the file
     response = flask.make_response(file_io.read())
-    response.headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    response.headers["Content-Disposition"] = f'attachment; filename="{file_name}"'
     return response
 
 
