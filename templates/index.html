@@ -5,12 +5,13 @@
     {% if logged_in %}
         <div class="row mb-4">
             <div class="col">
-                <a href="{{ url_for('upload_file') }}" class="btn btn-primary">Upload New Image</a>
+                <a href="{{ url_for('upload_file') }}" class="btn btn-primary">Upload your data</a>
             </div>
         </div>
 
+
         {% if files %}
-            <h2>Your Images</h2>
+            <h2>Your files</h2>
             <div class="row">
                 {% for file in files %}
                     <div class="col-md-4">
@@ -26,13 +27,13 @@
             </div>
         {% else %}
             <div class="alert alert-info">
-                You don't have any images in your Google Drive yet. Upload one now!
+                You don't have any files in your Google Drive yet. Upload one now!
             </div>
         {% endif %}
     {% else %}
         <div class="jumbotron">
-            <h2>Welcome to Google Drive Image Manager</h2>
-            <p class="lead">This application allows you to upload images to your Google Drive and download them later.</p>
+            <h2>Welcome to Year in Data</h2>
+            <p class="lead">This application allows you to visualise your year in data.</p>
             <hr class="my-4">
             <p>Please login with your Google account to get started.</p>
             <a href="{{ url_for('login') }}" class="btn btn-primary btn-lg">Login with Google</a>

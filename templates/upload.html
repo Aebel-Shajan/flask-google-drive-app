@@ -2,12 +2,21 @@
 {% extends "layout.html" %}
 
 {% block content %}
-    <h2>Upload Image to Google Drive</h2>
+    <h2>Upload data to Google Drive</h2>
     <form method="post" enctype="multipart/form-data">
-        <div class="mb-3">
-            <label for="file" class="form-label">Select Image</label>
-            <input type="file" class="form-control" id="file" name="file" accept="image/*" required>
-            <div class="form-text">Supported formats: JPG, PNG, GIF</div>
+        <div class="row">
+            <label for="data-source" class="col">Choose data source: </label>
+            <select name="data-source" id="data-source" class="form-select col">
+                {% for data_source in options %}
+                    <option value="{{ data_source }}">
+                        {{ data_source }}
+                    </option>
+                {% endfor %}
+            </select>
+            <div class="col"></div>
+            <input type="file" class="form-control" id="file" name="file" accept="text/csv" required>
+            <div class="form-text">Supported formats: .csv</div>
+
         </div>
         <button type="submit" class="btn btn-primary">Upload</button>
         <a href="{{ url_for('index') }}" class="btn btn-secondary">Cancel</a>
