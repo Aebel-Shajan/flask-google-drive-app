@@ -14,16 +14,20 @@
             <h2>Your data sources</h2>
             <div class="row">
                 {% for data_source in data_sources %}
-                    <div class="col-md-4">
+
                         <div class="card image-card">
                             <div class="card-body">
                                 <h5 class="card-title">{{ data_source.source }}</h5>
                                 <a href="{{ url_for('process_file', source=data_source.source, file_id=data_source.id) }}" class="btn btn-sm btn-primary">Process</a>
                                 <a href="{{ url_for('download_file', file_id=data_source.id) }}" class="btn btn-sm btn-success">Download</a>
                                 <a href="{{ data_source.webViewLink }}" target="_blank" class="btn btn-sm btn-info">View in Drive</a>
+                                {% if data_source.plot_data %}
+                                    <div class="object-fit">
+                                        <img src="data:image/png;base64,{{ data_source.plot_data }}" alt="Generated Plot">
+                                    </div>
+                                {% endif %}
                             </div>
                         </div>
-                    </div>
                 {% endfor %}
             </div>
         {% else %}

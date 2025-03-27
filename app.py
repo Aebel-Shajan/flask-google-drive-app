@@ -9,6 +9,7 @@ from google.oauth2.credentials import Credentials
 import yd_extractor
 
 import drive_helpers as drive_helpers
+import plot_helpers as plot_helpers
 import yd_extractor.strong
 
 # Configuration
@@ -70,15 +71,33 @@ def index():
 
     # Get the list of user's files
     input_folder_id = drive_helpers.get_or_create_nested_folder(credentials, "year-in-data/inputs")
+    output_folder_id = drive_helpers.get_or_create_nested_folder(credentials, "year-in-data/outputs")
     files: list[DriveFileInfo] = drive_helpers.retrieve_user_files(credentials, parent_id=input_folder_id)
     print(files)
     data_sources = []
     strong_source_found = False
     for file in files:
         if file["name"].startswith("strong") and not strong_source_found:
+            output_csv_id = drive_helpers.get_drive_file(credentials, "strong.csv", output_folder_id)
+            plot_data = None
+            if len(output_csv_id) > 0:
+                output_csv = None
+                try:
+                    print(output_csv_id[0]["id"])
+                    
+                    output_csv = drive_helpers.download_file(credentials, output_csv_id[0]["id"])
+                except:
+                    print("coouldnt download csv!")
+                
+                if output_csv:
+                    plot_data = plot_helpers.create_plot_from_data(
+                        file_content=output_csv.read(), 
+                        plot_function=plot_helpers.plot_strong_data
+                    )
             data_sources.append(
                 {
                     "source": "Strong",
+                    "plot_data": plot_data,
                     **file
                 }
             )
