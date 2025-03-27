@@ -103,7 +103,7 @@ def get_or_create_nested_folder(credentials: Credentials, folder_path:str):
 
 
 
-def file_exists(credentials: Credentials, name, parent_id):
+def get_drive_file(credentials: Credentials, name, parent_id):
     service = build("drive", "v3", credentials=credentials)
     query = f"name = '{name}' and '{parent_id}' in parents and trashed = false"
     results = service.files().list(
@@ -122,7 +122,7 @@ def upload_or_overwrite(credentials: Credentials, file_path, file_name, parent_i
     service = build("drive", "v3", credentials=credentials)
     
     # Step 1: Check if file already exists
-    existing_files = file_exists(credentials, file_name, parent_id)
+    existing_files = get_drive_file(credentials, file_name, parent_id)
 
     # Step 2: Prepare media and metadata
     media = MediaFileUpload(file_path, resumable=True) 
